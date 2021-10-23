@@ -123,7 +123,7 @@ class Text2Image:
             self.seed = None
 
         if self.settings['initial_image'] == 'None' or self.settings['initial_image'] == '':
-            self.initial_image = None
+            self.settings['initial_image'] = None
 
         if self.settings['target_images'] == '' or not self.settings['target_images']:
             self.target_images = []
@@ -171,8 +171,8 @@ class Text2Image:
         self.z_min = self.model.quantize.embedding.weight.min(dim=0).values[None, :, None, None]
         self.z_max = self.model.quantize.embedding.weight.max(dim=0).values[None, :, None, None]
 
-        if self.initial_image:
-            self.pil_image = Image.open(self.initial_image).convert('RGB')
+        if self.settings['initial_image']:
+            self.pil_image = Image.open(self.settings['initial_image']).convert('RGB')
             self.pil_image = self.pil_image.resize((self.sideX, self.sideY), Image.LANCZOS)
             self.z, *_ = self.model.encode(TF.to_tensor(self.pil_image).to(self.device).unsqueeze(0) * 2 - 1)
         else:
