@@ -16,7 +16,6 @@ import imageio
 from PIL import ImageFile, Image
 from imgtag import ImgTag    # metadata
 from libxmp import *         # metadata
-import libxmp                # metadata
 from stegano import lsb
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -31,8 +30,6 @@ from torchvision.transforms import functional as TF
 from tqdm.notebook import tqdm
 
 from CLIP import clip
-
-from guided_diffusion.script_util import create_model_and_diffusion, model_and_diffusion_defaults
 
 from utils import *
 
@@ -76,7 +73,6 @@ class Text2Image:
             # required
             'seed': -1,
             'display_frequency': 10,
-            'use_diffusion': False,
             'prompt': '',
             'width': 256,
             'height': 256,
