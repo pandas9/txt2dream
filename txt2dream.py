@@ -1,6 +1,7 @@
 from pathlib import Path
 import io
 import sys
+import os
 
 import math
 import numpy as np
@@ -14,9 +15,6 @@ from base64 import b64encode
 from omegaconf import OmegaConf
 import imageio
 from PIL import ImageFile, Image
-from imgtag import ImgTag    # metadata
-from libxmp import *         # metadata
-from stegano import lsb
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 from taming.models import cond_transformer, vqgan
@@ -29,7 +27,7 @@ from torchvision.transforms import functional as TF
 
 from tqdm.notebook import tqdm
 
-from CLIP import clip
+import clip
 
 from utils import *
 
@@ -67,7 +65,7 @@ class Text2Image:
 
     def __init__(self, settings={}):
         self.dir_path = os.path.dirname(os.path.abspath(__file__))
-        self.down_pretrained_models()
+        os.makedirs(f"{self.dir_path}/vqgan-steps/", exist_ok=True)
 
         self.settings = {
             # required
@@ -91,18 +89,16 @@ class Text2Image:
 
             # which models to download
             'pretrained_models': {
-                'diffusion': False,
-                'imagenet_1024': False,
-                'imagenet_16384': True,
+                'vqgan_imagenet_f16_1024': False,
+                'vqgan_imagenet_f16_16384': True,
                 'coco': True,
                 'wikiart_16384': True,
                 'sflckr': True,
 
-                'diffusion_512_ckpt': 'https://the-eye.eu/public/AI/models/512x512_diffusion_unconditional_ImageNet/512x512_diffusion_uncond_finetune_008100.pt',
-                'imagenet_1024_ckpt': 'https://heibox.uni-heidelberg.de/f/140747ba53464f49b476/?dl=1',
-                'imagenet_1024_yaml': 'https://heibox.uni-heidelberg.de/f/6ecf2af6c658432c8298/?dl=1',
-                'imagenet_16384_ckpt': 'https://heibox.uni-heidelberg.de/f/867b05fc8c4841768640/?dl=1',
-                'imagenet_16384_yaml': 'https://heibox.uni-heidelberg.de/f/274fb24ed38341bfa753/?dl=1',
+                'vqgan_imagenet_f16_1024_ckpt': 'https://heibox.uni-heidelberg.de/f/140747ba53464f49b476/?dl=1',
+                'vqgan_imagenet_f16_1024_yaml': 'https://heibox.uni-heidelberg.de/f/6ecf2af6c658432c8298/?dl=1',
+                'vqgan_imagenet_f16_16384_ckpt': 'https://heibox.uni-heidelberg.de/f/867b05fc8c4841768640/?dl=1',
+                'vqgan_imagenet_f16_16384_yaml': 'https://heibox.uni-heidelberg.de/f/274fb24ed38341bfa753/?dl=1',
                 'coco_ckpt': 'https://dl.nmkd.de/ai/clip/coco/coco.ckpt',
                 'coco_yaml': 'https://dl.nmkd.de/ai/clip/coco/coco.yaml',
                 'wikiart_16384_ckpt': 'http://eaidata.bmk.sh/data/Wikiart_16384/wikiart_f16_16384_8145600.ckpt',
@@ -113,6 +109,8 @@ class Text2Image:
         }
         for key, value in settings.items():
             self.settings[key] = value
+
+        self.down_pretrained_models()
 
         self.replace_grad = ReplaceGrad.apply
         self.clamp_with_grad = ClampWithGrad.apply
@@ -176,7 +174,7 @@ class Text2Image:
         if self.initial_image:
             self.pil_image = Image.open(self.initial_image).convert('RGB')
             self.pil_image = self.pil_image.resize((self.sideX, self.sideY), Image.LANCZOS)
-            self.z, *_ = model.encode(TF.to_tensor(self.pil_image).to(self.device).unsqueeze(0) * 2 - 1)
+            self.z, *_ = self.model.encode(TF.to_tensor(self.pil_image).to(self.device).unsqueeze(0) * 2 - 1)
         else:
             self.one_hot = F.one_hot(torch.randint(self.n_toks, [self.toksY * self.toksX], device=self.device), self.n_toks).float()
             self.z = self.one_hot @ self.model.quantize.embedding.weight
@@ -197,7 +195,7 @@ class Text2Image:
             self.pMs.append(Prompt(self.embed, self.replace_grad, self.weight, self.stop).to(self.device))
 
         for prompt in self.target_images:
-            self.path, self.weight, self.stop = parse_prompt(prompt)
+            self.path, self.weight, self.stop = self.parse_prompt(prompt)
             self.img = resize_image(Image.open(self.path).convert('RGB'), (self.sideX, self.sideY))
             self.batch = self.make_cutouts(TF.to_tensor(self.img).unsqueeze(0).to(self.device))
             self.embed = self.perceptor.encode_image(self.normalize(self.batch)).float()
@@ -213,13 +211,11 @@ class Text2Image:
     def dream(self):
         i = 0
         try:
-            with tqdm() as pbar:
-                while True:
-                    self.train(i)
-                    if i == self.settings['max_iterations']:
-                        break
-                    i += 1
-                    pbar.update()
+            while True:
+                self.train(i)
+                if i == self.settings['max_iterations']:
+                    break
+                i += 1
         except KeyboardInterrupt:
             pass
 
@@ -250,7 +246,6 @@ class Text2Image:
         img = np.transpose(img, (1, 2, 0))
         filename = f"{self.dir_path}/vqgan-steps/{i:04}.png"
         imageio.imwrite(filename, np.array(img))
-        add_xmp_data(filename, self.prompts, self.model_name, self.seed, self.settings['input_images'], i)
         
         return result
 
@@ -261,7 +256,6 @@ class Text2Image:
         self.display_message(f'i: {i}, loss: {sum(losses).item():g}, losses: {losses_str}')
         out = self.synth(self.z)
         TF.to_pil_image(out[0].cpu()).save('progress.png')
-        add_xmp_data('progress.png', self.prompts, self.model_name, self.seed, self.settings['input_images'], i)
 
     def vector_quantize(self, x, codebook):
         d = x.pow(2).sum(dim=-1, keepdim=True) + codebook.pow(2).sum(dim=1) - 2 * x @ codebook.T
@@ -315,62 +309,56 @@ class Text2Image:
 
     def down_pretrained_models(self):
         models_path = f'{self.dir_path}/models/'
-        os.makedirs(models_path, exist_ok=False)
+        os.makedirs(models_path, exist_ok=True)
 
-        if self.settings['pretrained_models']['diffusion']:
+        if self.settings['pretrained_models']['vqgan_imagenet_f16_1024']:
             self.stream_down(
-                self.settings['pretrained_models']['diffusion_512_ckpt'],
-                models_path
-            )
-
-        if self.settings['pretrained_models']['imagenet_1024']:
-            self.stream_down(
-                self.settings['pretrained_models']['imagenet_1024_ckpt'],
-                models_path
+                self.settings['pretrained_models']['vqgan_imagenet_f16_1024_ckpt'],
+                models_path + 'vqgan_imagenet_f16_1024.ckpt'
             )
             self.stream_down(
-                self.settings['pretrained_models']['imagenet_1024_yaml'],
-                models_path
+                self.settings['pretrained_models']['vqgan_imagenet_f16_1024_yaml'],
+                models_path + 'vqgan_imagenet_f16_1024.yaml'
             )
 
-        if self.settings['pretrained_models']['imagenet_16384']:
+        if self.settings['pretrained_models']['vqgan_imagenet_f16_16384']:
             self.stream_down(
-                self.settings['pretrained_models']['imagenet_16384_ckpt'],
-                models_path
+                self.settings['pretrained_models']['vqgan_imagenet_f16_16384_ckpt'],
+                models_path + 'vqgan_imagenet_f16_16384.ckpt'
             )
             self.stream_down(
-                self.settings['pretrained_models']['imagenet_16384_yaml'],
-                models_path
+                self.settings['pretrained_models']['vqgan_imagenet_f16_16384_yaml'],
+                models_path + 'vqgan_imagenet_f16_16384.yaml'
             )
 
         if self.settings['pretrained_models']['coco']:
             self.stream_down(
                 self.settings['pretrained_models']['coco_ckpt'],
-                models_path
+                models_path + 'coco.ckpt'
             )
             self.stream_down(
                 self.settings['pretrained_models']['coco_yaml'],
-                models_path
+                models_path + 'coco.yaml'
             )
 
         if self.settings['pretrained_models']['wikiart_16384']:
             self.stream_down(
                 self.settings['pretrained_models']['wikiart_16384_ckpt'],
-                models_path
+                models_path + 'wikiart_16384.ckpt'
             )
             self.stream_down(
                 self.settings['pretrained_models']['wikiart_16384_yaml'],
-                models_path
+                models_path + 'wikiart_16384.yaml'
             )
 
         if self.settings['pretrained_models']['sflckr']:
             self.stream_down(
                 self.settings['pretrained_models']['sflckr_ckpt'],
-                models_path
+                models_path + 'sflckr.ckpt'
             )
             self.stream_down(
                 self.settings['pretrained_models']['sflckr_yaml'],
-                models_path
+                models_path + 'sflckr.yaml'
             )
 
 settings = {

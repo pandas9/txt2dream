@@ -1,7 +1,6 @@
 git+https://github.com/openai/CLIP
 git+https://github.com/crowsonkb/guided-diffusion
 git+https://github.com/CompVis/taming-transformers
-git+https://github.com/xinntao/ESRGAN
 ftfy
 regex
 tqdm
@@ -11,12 +10,11 @@ kornia
 einops
 transformers
 stegano
-exempi
 python-xmp-toolkit
 imgtag
-pillow==7.1.2
+pillow
 taming-transformers
 imageio-ffmpeg
-torch==1.10.0+cu113
-torchvision==0.11.1+cu113
-torchaudio===0.10.0+cu113
+torch==1.10.0
+torchvision==0.11.1
+torchaudio===0.10.0

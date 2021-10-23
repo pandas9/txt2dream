@@ -4,13 +4,17 @@ from torch.nn import functional as F
 from torchvision import transforms
 from torchvision.transforms import functional as TF
 
+import math
+
+import requests
+
 class TorchUtils:
     def sinc(x):
         return torch.where(x != 0, torch.sin(math.pi * x) / (math.pi * x), x.new_ones([]))
      
     def lanczos(x, a):
         cond = torch.logical_and(-a < x, x < a)
-        out = torch.where(cond, sinc(x) * TorchUtils.sinc(x/a), x.new_zeros([]))
+        out = torch.where(cond, TorchUtils.sinc(x) * TorchUtils.sinc(x/a), x.new_zeros([]))
 
         return out / out.sum()
 
@@ -31,13 +35,13 @@ class TorchUtils:
         input = input.view([n * c, 1, h, w])
     
         if dh < h:
-            kernel_h = TorchUtils.lanczos(ramp(dh / h, 2), 2).to(input.device, input.dtype)
+            kernel_h = TorchUtils.lanczos(TorchUtils.ramp(dh / h, 2), 2).to(input.device, input.dtype)
             pad_h = (kernel_h.shape[0] - 1) // 2
             input = F.pad(input, (0, 0, pad_h, pad_h), 'reflect')
             input = F.conv2d(input, kernel_h[None, None, :, None])
     
         if dw < w:
-            kernel_w = TorchUtils.lanczos(ramp(dw / w, 2), 2).to(input.device, input.dtype)
+            kernel_w = TorchUtils.lanczos(TorchUtils.ramp(dw / w, 2), 2).to(input.device, input.dtype)
             pad_w = (kernel_w.shape[0] - 1) // 2
             input = F.pad(input, (pad_w, pad_w, 0, 0), 'reflect')
             input = F.conv2d(input, kernel_w[None, None, None, :])
@@ -156,19 +160,3 @@ def tv_loss(input):
     y_diff = input[..., 1:, :-1] - input[..., :-1, :-1]
     
     return (x_diff**2 + y_diff**2).mean([1, 2, 3])
-
-
-def add_xmp_data(nombrefichero, prompts, model_name, seed, input_images, i):
-    image = ImgTag(filename=nombrefichero)
-    image.xmp.append_array_item(libxmp.consts.XMP_NS_DC, 'creator', 'VQGAN+CLIP', {"prop_array_is_ordered":True, "prop_value_is_array":True})
-    if prompts:
-        image.xmp.append_array_item(libxmp.consts.XMP_NS_DC, 'title', " | ".join(args.prompts), {"prop_array_is_ordered":True, "prop_value_is_array":True})
-    else:
-        image.xmp.append_array_item(libxmp.consts.XMP_NS_DC, 'title', 'None', {"prop_array_is_ordered":True, "prop_value_is_array":True})
-    image.xmp.append_array_item(libxmp.consts.XMP_NS_DC, 'i', str(i), {"prop_array_is_ordered":True, "prop_value_is_array":True})
-    image.xmp.append_array_item(libxmp.consts.XMP_NS_DC, 'model', model_name, {"prop_array_is_ordered":True, "prop_value_is_array":True})
-    image.xmp.append_array_item(libxmp.consts.XMP_NS_DC, 'seed',str(seed) , {"prop_array_is_ordered":True, "prop_value_is_array":True})
-    image.xmp.append_array_item(libxmp.consts.XMP_NS_DC, 'input_images',str(input_images) , {"prop_array_is_ordered":True, "prop_value_is_array":True})
-    #for frases in args.prompts:
-    #    image.xmp.append_array_item(libxmp.consts.XMP_NS_DC, 'Prompt' ,frases, {"prop_array_is_ordered":True, "prop_value_is_array":True})
-    image.close()
