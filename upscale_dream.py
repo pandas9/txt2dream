@@ -7,6 +7,11 @@ from basicsr.archs.rrdbnet_arch import RRDBNet
 from realesrgan import RealESRGANer
 
 class ScaleImage:
+    '''
+    Scale image/s with Real-ESRGAN.
+    input accepts folder or a file
+    '''
+
     def __init__(self, settings={}) -> None:
         self.settings = {
             'input': './vqgan-steps',
@@ -94,8 +99,9 @@ class ScaleImage:
                 save_path = os.path.join(self.settings['output'], f'{imgname}_{self.settings["suffix"]}.{extension}')
                 cv2.imwrite(save_path, output)
 
-settings = {
-    'input': './vqgan-steps',
-    'output': './vqgan-steps-upscaled'
-}
-ScaleImage(settings)
+if __name__ == "__main__":
+    settings = {
+        'input': './vqgan-steps',
+        'output': './vqgan-steps-upscaled'
+    }
+    ScaleImage(settings)

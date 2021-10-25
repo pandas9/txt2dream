@@ -361,7 +361,8 @@ class Text2Image:
                 models_path + 'sflckr.yaml'
             )
 
-settings = {
-    'prompt': 'World where pyramids fly'
-}
-Text2Image(settings)
+if __name__ == "__main__":
+    settings = {
+        'prompt': 'World with flying pyramids'
+    }
+    Text2Image(settings)
