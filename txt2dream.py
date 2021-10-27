@@ -121,6 +121,8 @@ class Text2Image:
 
         if self.settings['seed'] == -1:
             self.seed = None
+        else:
+            self.seed = self.settings['seed']
 
         if self.settings['initial_image'] == 'None' or self.settings['initial_image'] == '':
             self.settings['initial_image'] = None
