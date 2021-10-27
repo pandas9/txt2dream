@@ -25,8 +25,6 @@ from torch.nn import functional as F
 from torchvision import transforms
 from torchvision.transforms import functional as TF
 
-from tqdm.notebook import tqdm
-
 import clip
 
 from utils import *
@@ -65,7 +63,6 @@ class Text2Image:
 
     def __init__(self, settings={}):
         self.dir_path = os.path.dirname(os.path.abspath(__file__))
-        os.makedirs(f"{self.dir_path}/vqgan-steps/", exist_ok=True)
 
         self.settings = {
             # required
@@ -80,6 +77,8 @@ class Text2Image:
             'target_images': '',
             'input_images': '',
             'max_iterations': 1000,
+            'output_folder': 'vqgan-steps',
+            'output_name': '',
 
             # additional
             'vq_init_weight': 0.0,
@@ -109,6 +108,7 @@ class Text2Image:
         }
         for key, value in settings.items():
             self.settings[key] = value
+        os.makedirs(f"{self.dir_path}/{self.settings['output_folder']}/", exist_ok=True)
 
         self.down_pretrained_models()
 
@@ -158,7 +158,14 @@ class Text2Image:
         self.noise_prompt_seeds = []
         self.noise_prompt_weights = []
 
-        self.model = self.load_vqgan_model(self.vqgan_config, self.vqgan_checkpoint).to(self.device)
+        self.model = self.load_vqgan_model(self.vqgan_config, self.vqgan_checkpoint)
+        if torch.cuda.device_count() > 1:
+            print("Let's use", torch.cuda.device_count(), "GPUs!")
+            self.model = nn.DataParallel(self.model, device_ids=[0, 1])
+            self.model.to(self.device)
+            self.model = self.model.module
+        else:
+            self.model.to(self.device)
         self.perceptor = clip.load(self.settings['clip_model'], jit=False)[0].eval().requires_grad_(False).to(self.device)
 
         self.cut_size = self.perceptor.visual.input_resolution
@@ -244,7 +251,10 @@ class Text2Image:
 
         img = np.array(out.mul(255).clamp(0, 255)[0].cpu().detach().numpy().astype(np.uint8))[:,:,:]
         img = np.transpose(img, (1, 2, 0))
-        filename = f"{self.dir_path}/vqgan-steps/{i:04}.png"
+        if self.settings['output_name'] == '':
+            filename = f"{self.dir_path}/{self.settings['output_folder']}/{i:04}.png"
+        else:
+            filename = f"{self.dir_path}/{self.settings['output_folder']}/{self.settings['output_name']}.png"
         imageio.imwrite(filename, np.array(img))
         
         return result
@@ -252,7 +262,6 @@ class Text2Image:
     @torch.no_grad()
     def checkin(self, i, losses):
         losses_str = ', '.join(f'{loss.item():g}' for loss in losses)
-        tqdm.write(f'i: {i}, loss: {sum(losses).item():g}, losses: {losses_str}')
         self.display_message(f'i: {i}, loss: {sum(losses).item():g}, losses: {losses_str}')
         out = self.synth(self.z)
         TF.to_pil_image(out[0].cpu()).save('progress.png')
