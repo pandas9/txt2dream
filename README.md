@@ -2,7 +2,7 @@
 machine vivid dreams
 
 # Requirements
-`pip install -r requirements.txt --upgrade`
+`pip install -r requirements.txt --upgrade`  <br />
 if system is not recognizing taming transformers import git clone https://github.com/CompVis/taming-transformers into same folder as txt2dream.py
 
 # Usage
