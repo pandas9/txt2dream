@@ -51,7 +51,7 @@ ScaleImage(settings)
 
 # Examples
 [pandas9.github.io/gen-art/](https://pandas9.github.io/gen-art/) <br />
-![gen-art](https://github.com/pandas9/gen-art/blob/main/public/0600_scaled.png?raw=true)
+![gen-art](https://github.com/pandas9/gen-art/blob/main/public/lighthouse/0600_scaled.png)
 
 # Docker
 Coming soon
