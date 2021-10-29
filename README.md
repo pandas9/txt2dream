@@ -57,10 +57,10 @@ ScaleImage(settings)
 Coming soon
 
 # References
-This kind of work is possible because of cool people such as
-https://github.com/justin-bennington/S2ML-Art-Generator
-https://github.com/xinntao/Real-ESRGAN
-https://github.com/CompVis/taming-transformers
-https://github.com/lucidrains/big-sleep
-https://github.com/openai/CLIP
+This kind of work is possible because of cool people such as <br />
+https://github.com/justin-bennington/S2ML-Art-Generator <br />
+https://github.com/xinntao/Real-ESRGAN <br />
+https://github.com/CompVis/taming-transformers <br />
+https://github.com/lucidrains/big-sleep <br />
+https://github.com/openai/CLIP <br />
 https://github.com/hojonathanho/diffusion
