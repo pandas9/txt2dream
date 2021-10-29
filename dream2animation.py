@@ -53,4 +53,4 @@ if __name__ == "__main__":
         'height': 512,
         'angle': 0,
     }
-    Image2Animation()
+    Image2Animation(settings)

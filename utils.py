@@ -4,6 +4,12 @@ from torch.nn import functional as F
 from torchvision import transforms
 from torchvision.transforms import functional as TF
 
+import kornia.augmentation as K
+
+from PIL import ImageFile, Image
+
+import io
+
 import math
 
 import requests
@@ -94,7 +100,7 @@ class MakeCutouts(nn.Module):
             offsetx = torch.randint(0, sideX - size + 1, ())
             offsety = torch.randint(0, sideY - size + 1, ())
             cutout = input[:, :, offsety:offsety + size, offsetx:offsetx + size]
-            cutouts.append(resample(cutout, (self.cut_size, self.cut_size)))
+            cutouts.append(TorchUtils.resample(cutout, (self.cut_size, self.cut_size)))
         batch = self.augs(torch.cat(cutouts, dim=0))
         if self.noise_fac:
             facs = batch.new_empty([self.cutn, 1, 1, 1]).uniform_(0, self.noise_fac)
