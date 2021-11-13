@@ -52,7 +52,7 @@ ScaleImage(settings)
 
 # Examples
 ![gen-art](examples/0900_scaled.png?raw=true)
-![gen-art](examples/out.mp4?raw=true)
+![gen-art](examples/out.webm?raw=true)
 
 # Docker
 Coming soon
