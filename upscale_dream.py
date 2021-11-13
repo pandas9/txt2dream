@@ -19,7 +19,7 @@ class ScaleImage:
             'model_path': 'https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth',
             'netscale': 4,
             'outscale': 4,
-            'suffix': 'scaled',
+            'suffix': '_scaled',
             'tile': 0,
             'tile_pad': 10,
             'pre_pad': 0,
@@ -96,7 +96,7 @@ class ScaleImage:
                     extension = self.settings['ext']
                 if img_mode == 'RGBA':  # RGBA images should be saved in png format
                     extension = 'png'
-                save_path = os.path.join(self.settings['output'], f'{imgname}_{self.settings["suffix"]}.{extension}')
+                save_path = os.path.join(self.settings['output'], f'{imgname}{self.settings["suffix"]}.{extension}')
                 cv2.imwrite(save_path, output)
 
 if __name__ == "__main__":

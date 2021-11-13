@@ -7,54 +7,59 @@ from torchvision.transforms import functional as TF
 import kornia.augmentation as K
 
 from PIL import ImageFile, Image
+import cv2
+
+import pandas as pd
+import numpy as np
+import math
 
 import io
 
-import math
-
 import requests
 
-class TorchUtils:
-    def sinc(x):
-        return torch.where(x != 0, torch.sin(math.pi * x) / (math.pi * x), x.new_ones([]))
-     
-    def lanczos(x, a):
-        cond = torch.logical_and(-a < x, x < a)
-        out = torch.where(cond, TorchUtils.sinc(x) * TorchUtils.sinc(x/a), x.new_zeros([]))
+import re
 
-        return out / out.sum()
+import moviepy.video.io.ImageSequenceClip
 
-    def ramp(ratio, width):
-        n = math.ceil(width / ratio + 1)
-        out = torch.empty([n])
-        cur = 0
-        for i in range(out.shape[0]):
-            out[i] = cur
-            cur += ratio
+import glob
 
-        return torch.cat([-out[1:].flip([0]), out])[1:-1]
-
-    def resample(input, size, align_corners=True):
-        n, c, h, w = input.shape
-        dh, dw = size
-    
-        input = input.view([n * c, 1, h, w])
-    
-        if dh < h:
-            kernel_h = TorchUtils.lanczos(TorchUtils.ramp(dh / h, 2), 2).to(input.device, input.dtype)
-            pad_h = (kernel_h.shape[0] - 1) // 2
-            input = F.pad(input, (0, 0, pad_h, pad_h), 'reflect')
-            input = F.conv2d(input, kernel_h[None, None, :, None])
-    
-        if dw < w:
-            kernel_w = TorchUtils.lanczos(TorchUtils.ramp(dw / w, 2), 2).to(input.device, input.dtype)
-            pad_w = (kernel_w.shape[0] - 1) // 2
-            input = F.pad(input, (pad_w, pad_w, 0, 0), 'reflect')
-            input = F.conv2d(input, kernel_w[None, None, None, :])
-    
-        input = input.view([n, c, h, w])
-        
-        return F.interpolate(input, size, mode='bicubic', align_corners=align_corners)
+def sinc(x):
+    return torch.where(x != 0, torch.sin(math.pi * x) / (math.pi * x), x.new_ones([]))
+ 
+def lanczos(x, a):
+    cond = torch.logical_and(-a < x, x < a)
+    out = torch.where(cond, sinc(x) * sinc(x/a), x.new_zeros([]))
+    return out / out.sum()
+ 
+def ramp(ratio, width):
+    n = math.ceil(width / ratio + 1)
+    out = torch.empty([n])
+    cur = 0
+    for i in range(out.shape[0]):
+        out[i] = cur
+        cur += ratio
+    return torch.cat([-out[1:].flip([0]), out])[1:-1]
+ 
+def resample(input, size, align_corners=True):
+    n, c, h, w = input.shape
+    dh, dw = size
+ 
+    input = input.view([n * c, 1, h, w])
+ 
+    if dh < h:
+        kernel_h = lanczos(ramp(dh / h, 2), 2).to(input.device, input.dtype)
+        pad_h = (kernel_h.shape[0] - 1) // 2
+        input = F.pad(input, (0, 0, pad_h, pad_h), 'reflect')
+        input = F.conv2d(input, kernel_h[None, None, :, None])
+ 
+    if dw < w:
+        kernel_w = lanczos(ramp(dw / w, 2), 2).to(input.device, input.dtype)
+        pad_w = (kernel_w.shape[0] - 1) // 2
+        input = F.pad(input, (pad_w, pad_w, 0, 0), 'reflect')
+        input = F.conv2d(input, kernel_w[None, None, None, :])
+ 
+    input = input.view([n, c, h, w])
+    return F.interpolate(input, size, mode='bicubic', align_corners=align_corners)
 
 
 class Prompt(nn.Module):
@@ -72,6 +77,12 @@ class Prompt(nn.Module):
         dists = dists * self.weight.sign()
 
         return self.weight.abs() * self.replace_grad(dists, torch.maximum(dists, self.stop)).mean()
+
+def parse_prompt(prompt):
+    vals = prompt.rsplit(':', 2)
+    vals = vals + ['', '1', '-inf'][len(vals):]
+
+    return vals[0], float(vals[1]), float(vals[2])
 
 
 class MakeCutouts(nn.Module):
@@ -100,12 +111,11 @@ class MakeCutouts(nn.Module):
             offsetx = torch.randint(0, sideX - size + 1, ())
             offsety = torch.randint(0, sideY - size + 1, ())
             cutout = input[:, :, offsety:offsety + size, offsetx:offsetx + size]
-            cutouts.append(TorchUtils.resample(cutout, (self.cut_size, self.cut_size)))
+            cutouts.append(resample(cutout, (self.cut_size, self.cut_size)))
         batch = self.augs(torch.cat(cutouts, dim=0))
         if self.noise_fac:
             facs = batch.new_empty([self.cutn, 1, 1, 1]).uniform_(0, self.noise_fac)
             batch = batch + facs * torch.randn_like(batch)
-
         return batch
 
 
@@ -113,7 +123,7 @@ def resize_image(image, out_size):
     ratio = image.size[0] / image.size[1]
     area = min(image.size[0] * image.size[1], out_size[0] * out_size[1])
     size = round((area * ratio)**0.5), round((area / ratio)**0.5)
-
+    
     return image.resize(size, Image.LANCZOS)
 
 
@@ -166,3 +176,85 @@ def tv_loss(input):
     y_diff = input[..., 1:, :-1] - input[..., :-1, :-1]
     
     return (x_diff**2 + y_diff**2).mean([1, 2, 3])
+
+
+def parse_key_frames(string, prompt_parser=None):
+    pattern = r'((?P<frame>[0-9]+):[\s]*[\(](?P<param>[\S\s]*?)[\)])'
+    frames = dict()
+    for match_object in re.finditer(pattern, string):
+        frame = int(match_object.groupdict()['frame'])
+        param = match_object.groupdict()['param']
+        if prompt_parser:
+            frames[frame] = prompt_parser(param)
+        else:
+            frames[frame] = param
+
+    if frames == {} and len(string) != 0:
+        raise RuntimeError('Key Frame string not correctly formatted')
+    
+    return frames
+
+
+def get_inbetweens(key_frames, max_frames, integer=False):
+    key_frame_series = pd.Series([np.nan for a in range(max_frames)])
+    for i, value in key_frames.items():
+        key_frame_series[i] = value
+    key_frame_series = key_frame_series.astype(float)
+    key_frame_series = key_frame_series.interpolate(limit_direction='both')
+    if integer:
+        return key_frame_series.astype(int)
+    
+    return key_frame_series
+
+
+def split_key_frame_text_prompts(frames, max_frames):
+    prompt_dict = dict()
+    for i, parameters in frames.items():
+        prompts = parameters.split('|')
+        for prompt in prompts:
+            string, value = prompt.split(':')
+            string = string.strip()
+            value = float(value.strip())
+            if string in prompt_dict:
+                prompt_dict[string][i] = value
+            else:
+                prompt_dict[string] = {i: value}
+    prompt_series_dict = dict()
+    for prompt, values in prompt_dict.items():
+        value_string = (
+            ', '.join([f'{value}: ({values[value]})' for value in values])
+        )
+        prompt_series = get_inbetweens(parse_key_frames(value_string), max_frames)
+        prompt_series_dict[prompt] = prompt_series
+    prompt_list = []
+    for i in range(max_frames):
+        prompt_list.append(
+            ' | '.join(
+                [f'{prompt}: {prompt_series_dict[prompt][i]}'
+                 for prompt in prompt_series_dict]
+            )
+        )
+
+    return prompt_list
+
+
+def read_image_workaround(path):
+    """
+    OpenCV reads images as BGR, Pillow saves them as RGB. Work around
+    this incompatibility to avoid colour inversions.
+    """
+
+    im_tmp = cv2.imread(path)
+    
+    return cv2.cvtColor(im_tmp, cv2.COLOR_BGR2RGB)
+
+def frames_to_video(out_folder, filename, fps):
+    image_files = []
+
+    for file in glob.glob(f'{out_folder}/*.png'):
+        image_files.append(file)
+
+    image_files.sort(key = lambda x: int(x.split('/')[-1].split('.')[0]))
+
+    clip = moviepy.video.io.ImageSequenceClip.ImageSequenceClip(image_files, fps=fps)
+    clip.write_videofile(filename)

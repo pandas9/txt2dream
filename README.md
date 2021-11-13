@@ -58,6 +58,7 @@ Coming soon
 
 # References
 This kind of work is possible because of cool people such as <br />
+https://github.com/crowsonkb <br />
 https://github.com/justin-bennington/S2ML-Art-Generator <br />
 https://github.com/xinntao/Real-ESRGAN <br />
 https://github.com/CompVis/taming-transformers <br />
