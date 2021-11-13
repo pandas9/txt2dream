@@ -379,7 +379,9 @@ class Text2Image:
             scale_settings = {
                 'input': f'{self.dir_path}/{self.settings["output_folder"]}',
                 'output': f'{self.dir_path}/{self.settings["output_folder"]}-upscaled',
-                'suffix': ''
+                'suffix': '',
+                'netscale': int(self.settings['upscale_strength']),
+                'outscale': int(self.settings['upscale_strength'])
             }
             out_folder = f'{self.dir_path}/{self.settings["output_folder"]}-upscaled'
             ScaleImage(scale_settings)
