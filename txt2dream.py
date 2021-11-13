@@ -509,7 +509,7 @@ if __name__ == "__main__":
     settings = {
         'key_frames': True,
         'generate_video': True,
-        'video_length': 6,
+        'video_length': 6, # seconds
         'target_fps': 30,
         'upscale_dream': True,
         'upscale_strength': 2, # available [2, 4] -> 2x or 4x the generated output

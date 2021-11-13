@@ -11,29 +11,27 @@ if system is not recognizing taming transformers import git clone https://github
 `python txt2dream.py`
 ```
 from txt2dream import Text2Image
-
 settings = {
-    'prompt': 'World with flying pyramids',
-    'width': 512,
-    'height': 512,
+    'key_frames': True,
+    'generate_video': True,
+    'video_length': 6, # seconds
+    'target_fps': 30,
+    'upscale_dream': True,
+    'upscale_strength': 2, # available [2, 4] -> 2x or 4x the generated output
+    'initial_image': '', # start from image
+    'target_images': '', # target the shape
+    'prompt': '10: (Apple: 1| Orange: 0), 20: (Apple: 0| Orange: 1| Peach: 1)',
+    'width': 256,
+    'height': 256,
+    'angle': '10: (0), 30: (10), 50: (0)',
+    'zoom': '10: (1), 30: (1.2), 50: (1)',
+    'translation_x': '0: (0)',
+    'translation_y': '0: (0)',
+    'iterations_per_frame': '0: (1)',
+    'vqgan_model': 'vqgan_imagenet_f16_16384', # available ["vqgan_imagenet_f16_16384", "vqgan_imagenet_f16_1024", "wikiart_16384", "coco", "sflckr"]
+    'clip_model': 'ViT-B/32' # available ['RN50', 'RN101', 'RN50x4', 'RN50x16', 'ViT-B/32','ViT-B/16']
 }
 Text2Image(settings)
-```
-
-##### Animate generated image
-`dream2animation.py`
-`python dream2animation.py`
-```
-from dream2animation import Image2Animation
-
-settings = {
-    'prompt': 'World with flying pyramids',
-    'width': 512,
-    'height': 512,
-    'angle': 30,
-    'zoom': 30
-}
-Image2Animation(settings)
 ```
 
 ##### Upscale generated images
