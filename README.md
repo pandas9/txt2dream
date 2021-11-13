@@ -52,7 +52,7 @@ ScaleImage(settings)
 
 # Examples
 ![gen-art](examples/0900_scaled.png?raw=true)
-![gen-vid](https://github.com/pandas9/txt2dream/blob/main/examples/out.mp4?raw=true)
+[![gen-vid]()](https://github.com/pandas9/txt2dream/blob/main/examples/out.mp4?raw=true)
 
 # Docker
 Coming soon
