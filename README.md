@@ -10,6 +10,9 @@ if system is not recognizing taming transformers import git clone https://github
 `txt2dream.py / txt2dream.ipynb`
 `python txt2dream.py`
 ```
+# total iterations = video_length * target_fps
+# key_frames = True, allows setup such as 10: (Apple: 1| Orange: 0), 20: (Apple: 0| Orange: 1| Peach: 1)
+# from frame 0 to frame 10 show Apple, from frame 10 to 20 show Orange & Peach
 from txt2dream import Text2Image
 settings = {
     'key_frames': True,
