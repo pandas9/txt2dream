@@ -51,8 +51,8 @@ ScaleImage(settings)
 ```
 
 # Examples
-![gen-art](examples/0900_scaled.png?raw=true)
 ![gen-vid](examples/out.gif?raw=true)
+![gen-art](examples/0900_scaled.png?raw=true)
 
 # Docker
 Coming soon
